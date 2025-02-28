@@ -13,12 +13,12 @@
  * @license MIT
  */
 
-import type {Battle} from './battle';
+import type { Battle } from "./battle";
 
 /** A move action */
 export interface MoveAction {
 	/** action type */
-	choice: 'move' | 'beforeTurnMove' | 'priorityChargeMove';
+	choice: "move" | "beforeTurnMove" | "priorityChargeMove";
 	order: 3 | 5 | 200 | 201 | 199 | 106;
 	/** priority of the action (lower first) */
 	priority: number;
@@ -37,7 +37,7 @@ export interface MoveAction {
 	/** a move to use (move action only) */
 	move: Move;
 	/** true if megaing or ultra bursting */
-	mega: boolean | 'done';
+	mega: boolean | "done";
 	/** if zmoving, the name of the zmove */
 	zmove?: string;
 	/** if dynamaxed, the name of the max move */
@@ -49,7 +49,7 @@ export interface MoveAction {
 /** A switch action */
 export interface SwitchAction {
 	/** action type */
-	choice: 'switch' | 'instaswitch' | 'revivalblessing';
+	choice: "switch" | "instaswitch" | "revivalblessing";
 	order: 3 | 6 | 103;
 	/** priority of the action (lower first) */
 	priority: number;
@@ -66,7 +66,7 @@ export interface SwitchAction {
 /** A Team Preview choice action */
 export interface TeamAction {
 	/** action type */
-	choice: 'team';
+	choice: "team";
 	/** priority of the action (lower first) */
 	priority: number;
 	/** unused for this action type */
@@ -80,19 +80,27 @@ export interface TeamAction {
 /** A generic action not done by a pokemon */
 export interface FieldAction {
 	/** action type */
-	choice: 'start' | 'residual' | 'pass' | 'beforeTurn';
+	choice: "start" | "residual" | "pass" | "beforeTurn";
 	/** priority of the action (lower first) */
 	priority: number;
 	/** unused for this action type */
 	speed: 1;
 	/** unused for this action type */
-	pokemon: null;
+	pokemon: Pokemon;
 }
 
 /** A generic action done by a single pokemon */
 export interface PokemonAction {
 	/** action type */
-	choice: 'megaEvo' | 'megaEvoX' | 'megaEvoY' | 'shift' | 'runSwitch' | 'event' | 'runDynamax' | 'terastallize';
+	choice:
+		| "megaEvo"
+		| "megaEvoX"
+		| "megaEvoY"
+		| "shift"
+		| "runSwitch"
+		| "event"
+		| "runDynamax"
+		| "terastallize";
 	/** priority of the action (lower first) */
 	priority: number;
 	/** speed of pokemon doing action (higher first if priority tie) */
@@ -105,7 +113,26 @@ export interface PokemonAction {
 	event?: string;
 }
 
-export type Action = MoveAction | SwitchAction | TeamAction | FieldAction | PokemonAction;
+/** A switch action */
+export interface ItemAction {
+	/** action type */
+	choice: "item";
+	/** priority of the action (lower first) */
+	priority: number;
+	/** unused for this action type */
+	speed: 1;
+	/** unused for this action type */
+	pokemon: Pokemon;
+	item?: string;
+}
+
+export type Action =
+	| MoveAction
+	| SwitchAction
+	| TeamAction
+	| FieldAction
+	| PokemonAction
+	| ItemAction;
 
 /**
  * An ActionChoice is like an Action and has the same structure, but it doesn't need to be fully filled out.
@@ -147,7 +174,9 @@ export class BattleQueue {
 		return this.list.unshift(action);
 	}
 	// eslint-disable-next-line no-restricted-globals
-	[Symbol.iterator]() { return this.list[Symbol.iterator](); }
+	[Symbol.iterator]() {
+		return this.list[Symbol.iterator]();
+	}
 	entries() {
 		return this.list.entries();
 	}
@@ -160,20 +189,23 @@ export class BattleQueue {
 	 */
 	resolveAction(action: ActionChoice, midTurn = false): Action[] {
 		if (!action) throw new Error(`Action not passed to resolveAction`);
-		if (action.choice === 'pass') return [];
+		if (action.choice === "pass") return [];
+		console.log(action);
+		if (action.choice === "item") return [];
 		const actions = [action];
 
 		if (!action.side && action.pokemon) action.side = action.pokemon.side;
-		if (!action.move && action.moveid) action.move = this.battle.dex.getActiveMove(action.moveid);
+		if (!action.move && action.moveid)
+			action.move = this.battle.dex.getActiveMove(action.moveid);
 		if (!action.order) {
-			const orders: {[choice: string]: number} = {
+			const orders: { [choice: string]: number } = {
 				team: 1,
 				start: 2,
 				instaswitch: 3,
 				beforeTurn: 4,
 				beforeTurnMove: 5,
 				revivalblessing: 6,
-
+				item: 10,
 				runSwitch: 101,
 				switch: 103,
 				megaEvo: 104,
@@ -192,65 +224,99 @@ export class BattleQueue {
 				action.order = orders[action.choice];
 			} else {
 				action.order = 200;
-				if (!['move', 'event'].includes(action.choice)) {
+				if (!["move", "event"].includes(action.choice)) {
 					throw new Error(`Unexpected orderless action ${action.choice}`);
 				}
 			}
 		}
 		if (!midTurn) {
-			if (action.choice === 'move') {
-				if (!action.maxMove && !action.zmove && action.move.beforeTurnCallback) {
-					actions.unshift(...this.resolveAction({
-						choice: 'beforeTurnMove', pokemon: action.pokemon, move: action.move, targetLoc: action.targetLoc,
-					}));
+			if (action.choice === "move") {
+				if (
+					!action.maxMove &&
+					!action.zmove &&
+					action.move.beforeTurnCallback
+				) {
+					actions.unshift(
+						...this.resolveAction({
+							choice: "beforeTurnMove",
+							pokemon: action.pokemon,
+							move: action.move,
+							targetLoc: action.targetLoc,
+						})
+					);
 				}
 				if (action.mega && !action.pokemon.isSkyDropped()) {
-					actions.unshift(...this.resolveAction({
-						choice: 'megaEvo',
-						pokemon: action.pokemon,
-					}));
+					actions.unshift(
+						...this.resolveAction({
+							choice: "megaEvo",
+							pokemon: action.pokemon,
+						})
+					);
 				}
 				if (action.megax && !action.pokemon.isSkyDropped()) {
-					actions.unshift(...this.resolveAction({
-						choice: 'megaEvoX',
-						pokemon: action.pokemon,
-					}));
+					actions.unshift(
+						...this.resolveAction({
+							choice: "megaEvoX",
+							pokemon: action.pokemon,
+						})
+					);
 				}
 				if (action.megay && !action.pokemon.isSkyDropped()) {
-					actions.unshift(...this.resolveAction({
-						choice: 'megaEvoY',
-						pokemon: action.pokemon,
-					}));
+					actions.unshift(
+						...this.resolveAction({
+							choice: "megaEvoY",
+							pokemon: action.pokemon,
+						})
+					);
 				}
 				if (action.terastallize && !action.pokemon.terastallized) {
-					actions.unshift(...this.resolveAction({
-						choice: 'terastallize',
-						pokemon: action.pokemon,
-					}));
+					actions.unshift(
+						...this.resolveAction({
+							choice: "terastallize",
+							pokemon: action.pokemon,
+						})
+					);
 				}
-				if (action.maxMove && !action.pokemon.volatiles['dynamax']) {
-					actions.unshift(...this.resolveAction({
-						choice: 'runDynamax',
-						pokemon: action.pokemon,
-					}));
+				if (action.maxMove && !action.pokemon.volatiles["dynamax"]) {
+					actions.unshift(
+						...this.resolveAction({
+							choice: "runDynamax",
+							pokemon: action.pokemon,
+						})
+					);
 				}
-				if (!action.maxMove && !action.zmove && action.move.priorityChargeCallback) {
-					actions.unshift(...this.resolveAction({
-						choice: 'priorityChargeMove',
-						pokemon: action.pokemon,
-						move: action.move,
-					}));
+				if (
+					!action.maxMove &&
+					!action.zmove &&
+					action.move.priorityChargeCallback
+				) {
+					actions.unshift(
+						...this.resolveAction({
+							choice: "priorityChargeMove",
+							pokemon: action.pokemon,
+							move: action.move,
+						})
+					);
 				}
-				action.fractionalPriority = this.battle.runEvent('FractionalPriority', action.pokemon, null, action.move, 0);
-			} else if (['switch', 'instaswitch'].includes(action.choice)) {
-				if (typeof action.pokemon.switchFlag === 'string') {
-					action.sourceEffect = this.battle.dex.moves.get(action.pokemon.switchFlag as ID) as any;
+				action.fractionalPriority = this.battle.runEvent(
+					"FractionalPriority",
+					action.pokemon,
+					null,
+					action.move,
+					0
+				);
+			} else if (["switch", "instaswitch"].includes(action.choice)) {
+				if (typeof action.pokemon.switchFlag === "string") {
+					action.sourceEffect = this.battle.dex.moves.get(
+						action.pokemon.switchFlag as ID
+					) as any;
 				}
 				action.pokemon.switchFlag = false;
 			}
 		}
 
-		const deferPriority = this.battle.gen === 7 && action.mega && action.mega !== 'done';
+		const deferPriority =
+			this.battle.gen === 7 && action.mega && action.mega !== "done";
 		if (action.move) {
 			let target = null;
 			action.move = this.battle.dex.getActiveMove(action.move);
@@ -300,8 +366,13 @@ export class BattleQueue {
 			const resolvedChoices = this.resolveAction(choice);
 			this.list.push(...resolvedChoices);
 			for (const resolvedChoice of resolvedChoices) {
-				if (resolvedChoice && resolvedChoice.choice === 'move' && resolvedChoice.move.id !== 'recharge') {
-					resolvedChoice.pokemon.side.lastSelectedMove = resolvedChoice.move.id;
+				if (
+					resolvedChoice &&
+					resolvedChoice.choice === "move" &&
+					resolvedChoice.move.id !== "recharge"
+				) {
+					resolvedChoice.pokemon.side.lastSelectedMove =
+						resolvedChoice.move.id;
 				}
 			}
 		}
@@ -309,7 +380,9 @@ export class BattleQueue {
 
 	willAct() {
 		for (const action of this.list) {
-			if (['move', 'switch', 'instaswitch', 'shift'].includes(action.choice)) {
+			if (
+				["move", "switch", "instaswitch", "shift"].includes(action.choice)
+			) {
 				return action;
 			}
 		}
@@ -319,7 +392,7 @@ export class BattleQueue {
 	willMove(pokemon: Pokemon) {
 		if (pokemon.fainted) return null;
 		for (const action of this.list) {
-			if (action.choice === 'move' && action.pokemon === pokemon) {
+			if (action.choice === "move" && action.pokemon === pokemon) {
 				return action;
 			}
 		}
@@ -339,7 +412,7 @@ export class BattleQueue {
 
 	cancelMove(pokemon: Pokemon) {
 		for (const [i, action] of this.list.entries()) {
-			if (action.choice === 'move' && action.pokemon === pokemon) {
+			if (action.choice === "move" && action.pokemon === pokemon) {
 				this.list.splice(i, 1);
 				return true;
 			}
@@ -349,7 +422,10 @@ export class BattleQueue {
 
 	willSwitch(pokemon: Pokemon) {
 		for (const action of this.list) {
-			if (['switch', 'instaswitch'].includes(action.choice) && action.pokemon === pokemon) {
+			if (
+				["switch", "instaswitch"].includes(action.choice) &&
+				action.pokemon === pokemon
+			) {
 				return action;
 			}
 		}
@@ -392,7 +468,10 @@ export class BattleQueue {
 			this.list.push(...actions);
 		} else {
 			if (lastIndex === null) lastIndex = this.list.length;
-			const index = firstIndex === lastIndex ? firstIndex : this.battle.random(firstIndex, lastIndex + 1);
+			const index =
+				firstIndex === lastIndex
+					? firstIndex
+					: this.battle.random(firstIndex, lastIndex + 1);
 			this.list.splice(index, 0, ...actions);
 		}
 	}
@@ -403,11 +482,16 @@ export class BattleQueue {
 
 	debug(action?: any): string {
 		if (action) {
-			return `${action.order || ''}:${action.priority || ''}:${action.speed || ''}:${action.subOrder || ''} - ${action.choice}${action.pokemon ? ' ' + action.pokemon : ''}${action.move ? ' ' + action.move : ''}`;
+			return `${action.order || ""}:${action.priority || ""}:${
+				action.speed || ""
+			}:${action.subOrder || ""} - ${action.choice}${
+				action.pokemon ? " " + action.pokemon : ""
+			}${action.move ? " " + action.move : ""}`;
 		}
-		return this.list.map(
-			queueAction => this.debug(queueAction)
-		).join('\n') + '\n';
+		return (
+			this.list.map((queueAction) => this.debug(queueAction)).join("\n") +
+			"\n"
+		);
 	}
 
 	sort() {
