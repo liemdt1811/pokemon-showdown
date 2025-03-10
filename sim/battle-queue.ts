@@ -190,8 +190,6 @@ export class BattleQueue {
 	resolveAction(action: ActionChoice, midTurn = false): Action[] {
 		if (!action) throw new Error(`Action not passed to resolveAction`);
 		if (action.choice === "pass") return [];
-		console.log(action);
-		if (action.choice === "item") return [];
 		const actions = [action];
 
 		if (!action.side && action.pokemon) action.side = action.pokemon.side;
@@ -206,6 +204,7 @@ export class BattleQueue {
 				beforeTurnMove: 5,
 				revivalblessing: 6,
 				item: 10,
+				throw: 11,
 				runSwitch: 101,
 				switch: 103,
 				megaEvo: 104,

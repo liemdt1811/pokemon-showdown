@@ -3391,36 +3391,59 @@ export class Battle {
 		}
 	}
 
-	useItem(sideId: SideID, itemId?: string) {
+	throwItem(sideId: SideID, itemId: string) {
 		const side = this.getSide(sideId);
-		const pokemon = side.active[0]; // Assuming the first active Pokémon is the target
-
+		const pokemon = side.active[0];
 		if (!pokemon || pokemon.fainted) {
 			this.add("message", `No valid target to use ${itemId}`);
 			return false;
 		}
-
+		switch (itemId) {
+			case "poke-ball":
+			case "great-ball":
+			case "ultra-ball":
+			case "nest-ball":
+			case "net-ball":
+			case "quick-ball":
+			case "timer-ball":
+			case "luxury-ball":
+			case "premier-ball":
+				this.add("throw", pokemon, `${itemId}`);
+				break;
+			default:
+				this.add("message", `Item ${itemId} is not recognized`);
+				return false;
+		}
+		return true;
+	}
+	useItem(sideId: SideID, itemId: string) {
+		const side = this.getSide(sideId);
+		const pokemon = side.active[0];
+		if (!pokemon || pokemon.fainted) {
+			this.add("message", `No valid target to use ${itemId}`);
+			return false;
+		}
 		let healAmount = 0;
 		switch (itemId) {
 			case "potion":
 				healAmount = 20;
 				break;
-			// Add more items and their effects here
+			case "super-potion":
+				healAmount = 50;
+				break;
+			case "hyper-potion":
+				healAmount = 120;
+				break;
 			default:
 				this.add("message", `Item ${itemId} is not recognized`);
 				return false;
 		}
-
-		const healed = this.heal(healAmount, pokemon, null, {
-			id: itemId,
-		} as Effect);
-		if (healed) {
-			this.add(
-				"-heal",
-				pokemon,
-				pokemon.getHealth,
-				`[from] item: ${itemId}`
-			);
+		if (healAmount) {
+			this.add("item", `${pokemon}`, itemId);
+			this.heal(healAmount, pokemon, null, {
+				id: itemId,
+				fullname: itemId,
+			} as Effect);
 		}
 		return true;
 	}
@@ -3661,9 +3684,6 @@ export class Battle {
 				this.swapPosition(action.pokemon, 1);
 				break;
 			case "item":
-				if (action.pokemon) {
-					this.useItem(action.pokemon.side.id, action.item);
-				}
 				break;
 			case "beforeTurn":
 				this.eachEvent("BeforeTurn");

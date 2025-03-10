@@ -34,7 +34,9 @@ export interface ChosenAction {
 		| "revivalblessing"
 		| "team"
 		| "shift"
-		| "pass"; // action type
+		| "pass"
+		| "item"
+		| "throw"; // action type
 	pokemon?: Pokemon; // the pokemon doing the action
 	targetLoc?: number; // relative location of the target to pokemon (move action only)
 	moveid: string; // a move to use (move action only)
@@ -49,6 +51,7 @@ export interface ChosenAction {
 	maxMove?: string; // if dynamaxed, the name of the max move
 	terastallize?: string; // if terastallizing, tera type
 	priority?: number; // priority of the action
+	itemId?: string; // the item to use (item action only)
 }
 
 /** What the player has chosen to happen. */
@@ -1219,6 +1222,52 @@ export class Side {
 		};
 	}
 
+	chooseItem(itemId: string) {
+		if (this.battle.requestState !== "move") {
+			return this.emitChoiceError(
+				`Can't use item: You need a move response`
+			);
+		}
+
+		const pokemon = this.active[0]; // Assuming the first active Pokémon is the target
+		if (!pokemon || pokemon.fainted) {
+			return this.emitChoiceError(`Can't use item: No valid target`);
+		}
+
+		if (!this.battle.useItem(this.id, itemId)) {
+			return this.emitChoiceError(`Can't use item: ${itemId} failed`);
+		}
+
+		this.choice.actions.push({
+			choice: "item",
+			pokemon,
+			itemId,
+		} as ChosenAction);
+
+		return true;
+	}
+
+	throwItem(itemId: string) {
+		if (this.battle.requestState !== "move") {
+			return this.emitChoiceError(
+				`Can't use item: You need a move response`
+			);
+		}
+		const pokemon = this.foe.active[0];
+		if (!pokemon || pokemon.fainted) {
+			return this.emitChoiceError(`Can't use item: No valid target`);
+		}
+		if (!this.battle.throwItem(this.foe.id, itemId)) {
+			return this.emitChoiceError(`Can't use item: ${itemId} failed`);
+		}
+		this.choice.actions.push({
+			choice: "throw",
+			target: pokemon,
+			itemId,
+		} as ChosenAction);
+		return true;
+	}
+
 	choose(input: string) {
 		if (!this.requestState) {
 			return this.emitChoiceError(
@@ -1339,9 +1388,10 @@ export class Side {
 					if (!this.chooseTeam(data)) return false;
 					break;
 				case "item":
-					this.choice.actions.push({
-						choice: "pass",
-					} as ChosenAction);
+					this.chooseItem(data);
+					break;
+				case "throw":
+					this.throwItem(data);
 					break;
 				case "pass":
 				case "skip":
